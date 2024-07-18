@@ -53,9 +53,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #define page_aligned __attribute__((aligned(PAGE_SIZE)))
 
-#define PCNET_BUFFER_SIZE 4096
-#define PCNET_PORT        0xc100
-
+#define PCNET_BUFFER_SIZE 4096 - 8
+#define PCNET_PORT        0xc140
 #define DRX     0x0001
 #define DTX     0x0002
 #define LOOP    0x0004
@@ -165,8 +164,8 @@ struct pcnet_desc {
 };
 
 static uint8_t pcnet_packet[PCNET_BUFFER_SIZE] = {
-	0x52, 0x54, 0x00, 0x12, 0x34, 0x56, 0x52,
-	0x54, 0x00, 0x12, 0x34, 0x56, 0x08, 0x00,
+	0x52, 0x54, 0x00, 0x12, 0x34, 0x57, 0x52,
+	0x54, 0x00, 0x12, 0x34, 0x57, 0x08, 0x00,
 };
 
 static int fd = -1;
@@ -231,6 +230,8 @@ uint64_t pcnet_card_config(struct pcnet_config *config,
 	config->tlen = 0x0;
 	config->rx_desc = (uint32_t)gva_to_gpa(rx_desc);
 	config->tx_desc = (uint32_t)gva_to_gpa(tx_desc);
+	printf("[-] address of Tx desc: %p\n", config->tx_desc);
+	printf("[-] address of Rx desc: %p\n", config->rx_desc);
 	return gva_to_gpa(config);
 }
 
@@ -247,6 +248,10 @@ void pcnet_desc_config(struct pcnet_desc *desc, void *buffer, int is_rx)
 	if (is_rx) {
 		/* receive buffers owned by the card */
 		desc->status_2 = 0x80;
+		printf("[-] address of Rx: %p\n", desc->addr);
+	}
+	else{
+		printf("[-] address of Tx: %p\n", desc->addr);
 	}
 }
 
@@ -275,10 +280,10 @@ void pcnet_packet_send(struct pcnet_desc *desc, void *buffer,
 
 int main()
 {
-	struct pcnet_config pcnet_config;
+	struct pcnet_config* pcnet_config = aligned_alloc(PAGE_SIZE, sizeof(struct pcnet_config));
 	uint32_t pcnet_config_mem;
-	struct pcnet_desc pcnet_tx_desc page_aligned;
-	struct pcnet_desc pcnet_rx_desc page_aligned;
+	struct pcnet_desc* pcnet_tx_desc = aligned_alloc(PAGE_SIZE, sizeof(struct pcnet_desc));
+	struct pcnet_desc* pcnet_rx_desc = aligned_alloc(PAGE_SIZE, sizeof(struct pcnet_desc));
 	void *pcnet_rx_buffer, *pcnet_tx_buffer;
 
 	void *addr;
@@ -302,14 +307,15 @@ int main()
 	addr = aligned_alloc(PAGE_SIZE, PCNET_BUFFER_SIZE);
 	pcnet_tx_buffer = (uint64_t *)addr;
 
-	pcnet_desc_config(&pcnet_rx_desc, pcnet_rx_buffer, 1);
-	pcnet_desc_config(&pcnet_tx_desc, pcnet_tx_buffer, 0);
+	pcnet_desc_config(pcnet_rx_desc, pcnet_rx_buffer, 1);
+	pcnet_desc_config(pcnet_tx_desc, pcnet_tx_buffer, 0);
 
-	pcnet_config_mem = (uint32_t)pcnet_card_config(&pcnet_config,
-	                                               &pcnet_rx_desc,
-	                                               &pcnet_tx_desc);
+	pcnet_config_mem = (uint32_t)pcnet_card_config(pcnet_config,
+	                                               pcnet_rx_desc,
+	                                               pcnet_tx_desc);
 	lo = (uint16_t)pcnet_config_mem;
 	hi = pcnet_config_mem >> 16;
+	printf("[-] address of init block: %p\n", pcnet_config_mem);
 
 	/* compute required crc */
 	ptr = pcnet_packet;
@@ -331,14 +337,17 @@ int main()
 	outw(2, PCNET_PORT + RAP);
 	outw(hi, PCNET_PORT + RDP);
 
+
 	/* init and start */
 	outw(0, PCNET_PORT + RAP);
 	outw(0x3, PCNET_PORT + RDP);
 
 	sleep(2);
 
-	pcnet_packet_send(&pcnet_tx_desc, pcnet_tx_buffer, pcnet_packet,
+	pcnet_packet_send(pcnet_tx_desc, pcnet_tx_buffer, pcnet_packet,
 	                  PCNET_BUFFER_SIZE);
+
+	sleep(2);
 
 	return 0;
 }
