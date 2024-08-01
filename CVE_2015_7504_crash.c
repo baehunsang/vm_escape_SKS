@@ -53,7 +53,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #define page_aligned __attribute__((aligned(PAGE_SIZE)))
 
-#define PCNET_BUFFER_SIZE 4096 - 8
+#define PCNET_BUFFER_SIZE 4096
 #define PCNET_PORT        0xc140
 #define DRX     0x0001
 #define DTX     0x0002
