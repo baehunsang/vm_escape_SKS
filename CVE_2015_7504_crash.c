@@ -200,6 +200,17 @@ uint64_t gva_to_gpa(void *addr)
 }
 
 /* PCNET primitives */
+
+/*
+	Patch the PCNET packet so that CRC value could be `target`.
+
+	in :
+		packet: PCNET packet
+		current: current CRC
+		target: target CRC (use htonl().)
+	
+	out: void
+*/
 void pcnet_packet_patch_crc(uint8_t *packet, uint32_t current,
                             uint32_t target)
 {
@@ -307,12 +318,18 @@ int main()
 	addr = aligned_alloc(PAGE_SIZE, PCNET_BUFFER_SIZE);
 	pcnet_tx_buffer = (uint64_t *)addr;
 
-	pcnet_desc_config(pcnet_rx_desc, pcnet_rx_buffer, 1);
-	pcnet_desc_config(pcnet_tx_desc, pcnet_tx_buffer, 0);
+	/*
+		TODO: Initialize Tx and Rx buffer
+	*/
+	
 
-	pcnet_config_mem = (uint32_t)pcnet_card_config(pcnet_config,
-	                                               pcnet_rx_desc,
-	                                               pcnet_tx_desc);
+	/*
+		TODO: Initialize init block of PCNET device
+
+		guest virtual address of init block is stored in `pcnet_config_mem`
+	*/
+ 
+
 	lo = (uint16_t)pcnet_config_mem;
 	hi = pcnet_config_mem >> 16;
 	printf("[-] address of init block: %p\n", pcnet_config_mem);
@@ -321,31 +338,32 @@ int main()
 	ptr = pcnet_packet;
 	while (ptr != &pcnet_packet[PCNET_BUFFER_SIZE - 4])
 		CRC(fcs, *ptr++);
-	pcnet_packet_patch_crc(ptr, fcs, htonl(0xdeadbeef));
 
-	/* soft reset */
-	inl(PCNET_PORT + 0x18);
-	inw(PCNET_PORT + RST);
+	/*
+		TODO: Patch PCNET packet so that CRC value could be target value
+	*/
 
-	/* set swstyle */
-	outw(58, PCNET_PORT + RAP);
-	outw(0x0102, PCNET_PORT + RDP);
+	/*
+		TODO: Initialize hardware.
 
-	/* card config */
-	outw(1, PCNET_PORT + RAP);
-	outw(lo, PCNET_PORT + RDP);
-	outw(2, PCNET_PORT + RAP);
-	outw(hi, PCNET_PORT + RDP);
+		Hint: See lecture note.
+	*/
 
+	/* 1. soft reset */
 
-	/* init and start */
-	outw(0, PCNET_PORT + RAP);
-	outw(0x3, PCNET_PORT + RDP);
+	/* 2. set swstyle */
+
+	/* 3. card config */
+
+	/* 4. init and start */
+
 
 	sleep(2);
 
-	pcnet_packet_send(pcnet_tx_desc, pcnet_tx_buffer, pcnet_packet,
-	                  PCNET_BUFFER_SIZE);
+	/*
+		TODO: Send packet
+	*/
+
 
 	sleep(2);
 
